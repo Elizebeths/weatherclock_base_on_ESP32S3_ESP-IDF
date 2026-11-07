@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+._*
+
+# ESP-IDF / CMake generated output
+build/
+build-*/
+managed_components/
+sdkconfig.old
+sdkconfig.old.*
+CMakeUserPresets.json
+compile_commands.json
+
+# Editor and Python temporary files
+.vscode/
+.idea/
+__pycache__/
+*.pyc
