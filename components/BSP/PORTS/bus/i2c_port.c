@@ -6,13 +6,7 @@
 static i2c_master_bus_handle_t s_bus_handle;
 static i2c_master_dev_handle_t s_device_handles[128];
 static os_mutex_t s_bus_mutex;
-static uint32_t s_clock_hz, s_last_error;
-
-static port_status_t record_i2c_result(esp_err_t esp_error) {
-  if (esp_error != ESP_OK)
-    s_last_error = (uint32_t)esp_error;
-  return port_from_esp(esp_error);
-}
+static uint32_t s_clock_hz;
 
 port_status_t i2c_port_init(uint32_t clock_hz) {
   if (clock_hz > 400000U)
@@ -38,7 +32,7 @@ port_status_t i2c_port_init(uint32_t clock_hz) {
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
       };
-      status = record_i2c_result(i2c_new_master_bus(&bus_config, &s_bus_handle));
+      status = port_from_esp(i2c_new_master_bus(&bus_config, &s_bus_handle));
       if (status == PORT_OK)
         s_clock_hz = clock_hz ? clock_hz : APP_I2C_CLK_HZ;
     }
@@ -86,7 +80,7 @@ static port_status_t transfer_i2c_data(uint8_t device_address, const uint8_t *tx
     else
       esp_error = i2c_master_receive(device_handle, rx_data, rx_length, (int)timeout_ms);
   }
-  port_status_t status = record_i2c_result(esp_error);
+  port_status_t status = port_from_esp(esp_error);
   os_port_mutex_unlock(&s_bus_mutex);
   return status;
 }
@@ -137,7 +131,7 @@ port_status_t i2c_port_mem_write(uint8_t device_address, uint16_t register_addre
     };
     esp_error = i2c_master_multi_buffer_transmit(device_handle, tx_buffers, 2, (int)timeout_ms);
   }
-  port_status_t status = record_i2c_result(esp_error);
+  port_status_t status = port_from_esp(esp_error);
   os_port_mutex_unlock(&s_bus_mutex);
   return status;
 }
@@ -161,8 +155,6 @@ port_status_t i2c_port_probe(uint8_t device_address, uint32_t max_attempts, uint
     if (esp_error == ESP_OK || (esp_error != ESP_ERR_TIMEOUT && esp_error != ESP_ERR_NOT_FOUND))
       break;
   }
-  if (esp_error != ESP_OK)
-    s_last_error = (uint32_t)esp_error;
   os_port_mutex_unlock(&s_bus_mutex);
   return esp_error == ESP_ERR_NOT_FOUND ? PORT_TIMEOUT : port_from_esp(esp_error);
 }
@@ -188,21 +180,10 @@ void i2c_port_unlock(void) {
   os_port_mutex_unlock(&s_bus_mutex);
 }
 
-uint32_t i2c_port_lock_depth(void) {
-  port_enter_critical();
-  uint32_t lock_depth = s_bus_mutex.depth;
-  port_exit_critical();
-  return lock_depth;
-}
-
 uint8_t i2c_port_bus_index(void) {
   return BOARD_I2C_BUS_INDEX;
 }
 
 uint32_t i2c_port_clock_hz(void) {
   return s_clock_hz;
-}
-
-uint32_t i2c_port_last_error(void) {
-  return s_last_error;
 }

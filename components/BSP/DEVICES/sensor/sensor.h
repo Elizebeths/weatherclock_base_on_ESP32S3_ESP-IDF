@@ -22,7 +22,7 @@
  * 为什么包装函数是 static inline：
  *   本层刻意只保留「一个公共头 + 各型号一个 .c」，与 lcd.h 的聚合门面保持一致，
  *   不额外引入 sensor.c 与对应的 stub。C99 下内联包装零开销，还省掉了每个调用点
- *   重复判空、重复解引用的样板代码。
+ *   重复解引用的样板代码。静态设备在 init 时检查函数表，后续直接分派。
  ******************************************************************************
  */
 
@@ -98,45 +98,35 @@ typedef struct {
  */
 struct sensor_dev {
   const sensor_ops_t *ops; /**< 型号实现，非空表示已绑定 */
-  uint8_t addr7;           /**< 7 位从机地址（实现内部左移成 HAL 的 8 位形式） */
+  uint8_t addr7;           /**< 7 位从机地址，直接传给 i2c_port */
   void *ctx;               /**< 型号私有上下文，可为 NULL */
 };
 
 /* ==========================================================================
- * 三、统一调用入口（对 ops 的安全包装）
+ * 三、统一调用入口（设备须静态绑定完整函数表）
  * ========================================================================== */
 
-/** @brief 句柄是否已绑定型号实现 */
-static inline bool sensor_dev_bound(const sensor_dev_t *dev) {
-  return (dev != NULL) && (dev->ops != NULL) && (dev->ops->read != NULL);
-}
-
-/** @brief 型号名（未绑定或未命名时返回 "unknown"，可直接进日志） */
+/** @brief 型号名；设备及其型号名称必须有效 */
 static inline const char *sensor_dev_name(const sensor_dev_t *dev) {
-  return sensor_dev_bound(dev) && (dev->ops->name != NULL) ? dev->ops->name : "unknown";
+  return dev->ops->name;
 }
 
-/** @brief 初始化传感器（未绑定实现时返回 PORT_ERROR，不产生空指针解引用） */
+/** @brief 初始化传感器；完整函数表是内部约定，在此检查 */
 static inline port_status_t sensor_dev_init(sensor_dev_t *dev) {
-  if (!sensor_dev_bound(dev) || (dev->ops->init == NULL)) {
-    return PORT_ERROR;
-  }
+  APP_ASSERT(dev != NULL && dev->ops != NULL && dev->ops->name != NULL &&
+             dev->ops->init != NULL && dev->ops->probe != NULL &&
+             dev->ops->read != NULL);
   return dev->ops->init(dev);
 }
 
 /** @brief 探测传感器是否在线 */
 static inline port_status_t sensor_dev_probe(sensor_dev_t *dev) {
-  if (!sensor_dev_bound(dev) || (dev->ops->probe == NULL)) {
-    return PORT_ERROR;
-  }
   return dev->ops->probe(dev);
 }
 
-/** @brief 读取一次采样（out 为空时返回 PORT_ERROR，不做部分写入） */
+/** @brief 读取一次采样；out 必须非 NULL */
 static inline port_status_t sensor_dev_read(sensor_dev_t *dev, sensor_sample_t *out) {
-  if (!sensor_dev_bound(dev) || (out == NULL)) {
-    return PORT_ERROR;
-  }
+  APP_ASSERT(out != NULL);
   return dev->ops->read(dev, out);
 }
 

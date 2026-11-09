@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 
+#include "common/port.h"
 #include "display/gfx/lcd_draw.h"
 
 /** 数值格式化缓冲区：10 位十进制 + 符号 + 小数点 + 少量填充 */
@@ -50,13 +51,9 @@ static bool lcd_text_bit_(const uint8_t *row_bits, uint16_t px) {
  * 字符 / 字符串
  * ========================================================================== */
 
-void lcd_text_char(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
-                   char ch, const lcd_text_style_t *style) {
-  if ((c == NULL) || (f == NULL) || (style == NULL) || (f->w == 0U) ||
-      (f->h == 0U)) {
-    return;
-  }
-
+/* 参数由文本入口检查，字符串逐字符绘制时不再重复检查。 */
+static void lcd_text_char_(lcd_canvas_t *c, const lcd_font_t *f, int32_t x,
+                           int32_t y, char ch, const lcd_text_style_t *style) {
   /* 字体不支持的字符退化为空格，保证排版宽度不变 */
   if (!lcd_font_supports(f, ch)) {
     ch = ' ';
@@ -87,24 +84,27 @@ void lcd_text_char(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
   }
 }
 
+void lcd_text_char(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
+                   char ch, const lcd_text_style_t *style) {
+  APP_ASSERT(c != NULL && f != NULL && style != NULL && f->w > 0U && f->h > 0U);
+  lcd_text_char_(c, f, x, y, ch, style);
+}
+
 void lcd_text_string(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
                      const char *s, const lcd_text_style_t *style) {
-  if ((c == NULL) || (f == NULL) || (s == NULL) || (style == NULL)) {
-    return;
-  }
+  APP_ASSERT(c != NULL && f != NULL && s != NULL && style != NULL &&
+             f->w > 0U && f->h > 0U);
 
   int32_t cx = x;
   while (*s != '\0') {
-    lcd_text_char(c, f, cx, y, *s, style);
+    lcd_text_char_(c, f, cx, y, *s, style);
     cx += (int32_t)f->w;
     s++;
   }
 }
 
 uint16_t lcd_text_measure(const lcd_font_t *f, const char *s) {
-  if ((f == NULL) || (s == NULL)) {
-    return 0U;
-  }
+  APP_ASSERT(f != NULL && s != NULL);
   uint32_t n = 0U;
   while (s[n] != '\0') {
     n++;
@@ -164,19 +164,9 @@ static uint32_t lcd_text_abs32_(int32_t v) {
 void lcd_text_u32(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
                   uint32_t value, uint8_t digits, char pad_ch,
                   const lcd_text_style_t *style) {
-  if ((c == NULL) || (f == NULL) || (style == NULL)) {
-    return;
-  }
-  char buf[LCD_TEXT_FMT_CAP];
-  const uint8_t n = lcd_text_fmt_digits_(buf, (uint8_t)sizeof(buf), value, digits,
-                                         pad_ch);
-  if (n == 0U) {
-    return;
-  }
   char str[LCD_TEXT_FMT_CAP + 1U];
-  for (uint8_t i = 0U; i < n; i++) {
-    str[i] = buf[i];
-  }
+  const uint8_t n = lcd_text_fmt_digits_(str, LCD_TEXT_FMT_CAP, value, digits,
+                                        pad_ch);
   str[n] = '\0';
   lcd_text_string(c, f, x, y, str, style);
 }
@@ -184,39 +174,25 @@ void lcd_text_u32(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
 void lcd_text_i32(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
                   int32_t value, uint8_t digits, char pad_ch,
                   const lcd_text_style_t *style) {
-  if ((c == NULL) || (f == NULL) || (style == NULL)) {
-    return;
-  }
-
   const bool negative = (value < 0);
   /* 符号占一位，因此数字可用宽度为 digits - 1 */
   const uint8_t num_width = (negative && (digits > 0U)) ? (uint8_t)(digits - 1U)
                                                         : digits;
-  char digits_buf[LCD_TEXT_FMT_CAP];
-  const uint8_t n = lcd_text_fmt_digits_(digits_buf, (uint8_t)sizeof(digits_buf),
-                                         lcd_text_abs32_(value), num_width,
-                                         pad_ch);
-
   char str[LCD_TEXT_FMT_CAP + 2U];
-  uint8_t pos = 0U;
+  const uint8_t pos = negative ? 1U : 0U;
   if (negative) {
-    str[pos] = '-';
-    pos++;
+    str[0] = '-';
   }
-  for (uint8_t i = 0U; i < n; i++) {
-    str[pos] = digits_buf[i];
-    pos++;
-  }
-  str[pos] = '\0';
+  const uint8_t n = lcd_text_fmt_digits_(&str[pos], LCD_TEXT_FMT_CAP,
+                                        lcd_text_abs32_(value), num_width,
+                                        pad_ch);
+  str[pos + n] = '\0';
   lcd_text_string(c, f, x, y, str, style);
 }
 
 void lcd_text_fixed(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
                     int32_t scaled, uint8_t frac_digits, uint8_t digits,
                     char pad_ch, const lcd_text_style_t *style) {
-  if ((c == NULL) || (f == NULL) || (style == NULL)) {
-    return;
-  }
   if (frac_digits > 6U) {
     frac_digits = 6U;
   }

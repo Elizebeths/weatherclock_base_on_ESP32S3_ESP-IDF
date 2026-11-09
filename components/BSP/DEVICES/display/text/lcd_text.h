@@ -46,18 +46,19 @@ lcd_text_style_t lcd_text_style_transparent(lcd_color_t fg);
 /** @brief 构造「不透明」样式（先铺底色再画字，UI 常规文本使用） */
 lcd_text_style_t lcd_text_style_opaque(lcd_color_t fg, lcd_color_t bg);
 
-/** @brief 单个字符的像素宽度（即字模宽度） */
+/** @brief 单个字符的像素宽度；f 必须为有效字体 */
 static inline uint16_t lcd_text_glyph_w(const lcd_font_t *f) {
-  return (f == NULL) ? 0U : f->w;
+  return f->w;
 }
 
-/** @brief 单个字符的像素高度（即字模高度） */
+/** @brief 单个字符的像素高度；f 必须为有效字体 */
 static inline uint16_t lcd_text_glyph_h(const lcd_font_t *f) {
-  return (f == NULL) ? 0U : f->h;
+  return f->h;
 }
 
 /**
  * @brief 字符串渲染后的像素宽度
+ * @note  f 与 s 不可为 NULL。
  * @note  不含换行处理：'\n' 及其后内容按不可显示字符退化为空格宽度。
  */
 uint16_t lcd_text_measure(const lcd_font_t *f, const char *s);
@@ -68,12 +69,14 @@ uint16_t lcd_text_measure(const lcd_font_t *f, const char *s);
  * @param x,y   字符左上角（像素坐标，允许越界，自动裁剪）
  * @param ch    字符；字体不支持的字符退化为空格
  * @param style 样式（不可为 NULL）
+ * @note  字体宽高必须非零；绘制入口对参数约束使用断言。
  */
 void lcd_text_char(lcd_canvas_t *c, const lcd_font_t *f, int32_t x, int32_t y,
                    char ch, const lcd_text_style_t *style);
 
 /**
  * @brief 绘制字符串（自左向右逐个字符推进）
+ * @note  c、f、s、style 不可为 NULL，字体宽高必须非零。
  * @note  与旧实现不同：**不做「值变短后残留」的处理**——不透明样式下每个
  *        字符格自带底色，超出新串长度的旧格子需要调用方显式填充或标脏清除。
  *        约定：UI 中「值会变短」的字段请在绘制前用 lcd_draw_box 铺一次底色，

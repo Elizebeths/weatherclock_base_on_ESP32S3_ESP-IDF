@@ -115,26 +115,11 @@ void lcd_dirty_add_screen(void) {
   s_count = 1U;
 }
 
-bool lcd_dirty_take_all(lcd_rect_t *out, uint32_t capacity, uint32_t *count) {
-  if ((out == NULL) || (count == NULL) || (capacity == 0U)) {
-    return false;
-  }
-
-  uint32_t n = s_count;
-  if (n > capacity) {
-    n = capacity;
-  }
-
+uint32_t lcd_dirty_take_all(lcd_rect_t out[DISPLAY_DIRTY_MAX]) {
+  const uint32_t n = s_count;
   for (uint32_t i = 0U; i < n; i++) {
     out[i] = s_rects[i];
   }
-  /* 理论上不会走到：capacity 就是表容量。防御性处理——把溢出的项并进末项，
-   * 保证「被改动过」这一信息不丢失（宁可多刷，不可漏刷）。 */
-  for (uint32_t i = n; i < s_count; i++) {
-    lcd_rect_union(&out[n - 1U], &s_rects[i], &out[n - 1U]);
-  }
-
-  *count = n;
   s_count = 0U;
-  return true;
+  return n;
 }

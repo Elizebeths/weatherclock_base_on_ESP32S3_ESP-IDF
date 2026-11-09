@@ -93,23 +93,13 @@ static const sensor_ops_t s_dht20_ops = {
 
 static sensor_dev_t s_dht20_dev = {
     .ops = &s_dht20_ops,
-    /* board.h 只登记 7 位地址；i2c_port 内部左移成 HAL 需要的 0x70 */
+    /* ESP-IDF I2C 接口直接使用 board.h 中的 7 位地址。 */
     .addr7 = BOARD_AHT20_I2C_ADDR7,
     .ctx = NULL,
 };
 
-/**
- * 上电稳定等待是否已完成。
- * 「上电等待」是电源事件而非 init 事件：只做一次，保证 init 真正的幂等
- * （否则自检与业务各调一次 init 就会白等两个 APP_DHT20_POWER_ON_DELAY_MS）。
- */
-static bool s_powered_ = false;
-
-/** @brief 失败出口：清掉上电标志，让下一次重试重新走完整上电等待 */
-static port_status_t dht20_fail_(port_status_t st) {
-  s_powered_ = false;
-  return st;
-}
+/** 本次 MCU 运行期间是否已完成首次上电等待；通信失败不重置该状态。 */
+static bool s_power_on_wait_done = false;
 
 /* ==========================================================================
  * 三、内部工具
@@ -144,12 +134,12 @@ static port_status_t dht20_read_status_(uint8_t *status) {
  * 四、对外 API
  * ========================================================================== */
 
-port_status_t dht20_init(void) { return dht20_ops_init_(&s_dht20_dev); }
+port_status_t dht20_init(void) { return sensor_dev_init(&s_dht20_dev); }
 
-port_status_t dht20_probe(void) { return dht20_ops_probe_(&s_dht20_dev); }
+port_status_t dht20_probe(void) { return sensor_dev_probe(&s_dht20_dev); }
 
 port_status_t dht20_read(sensor_sample_t *out) {
-  return dht20_ops_read_(&s_dht20_dev, out);
+  return sensor_dev_read(&s_dht20_dev, out);
 }
 
 sensor_dev_t *dht20_device(void) { return &s_dht20_dev; }
@@ -161,35 +151,28 @@ uint8_t dht20_addr7(void) { return s_dht20_dev.addr7; }
  * ========================================================================== */
 
 static port_status_t dht20_ops_probe_(sensor_dev_t *dev) {
-  if (dev == NULL) {
-    return PORT_ERROR;
-  }
   /* 多重试几次覆盖上电抖动；i2c_port_probe 内部只回 PORT_OK / PORT_TIMEOUT */
   return i2c_port_probe(dev->addr7, APP_DHT20_PROBE_TRIALS,
                         APP_I2C_TIMEOUT_MS);
 }
 
 static port_status_t dht20_ops_init_(sensor_dev_t *dev) {
-  if (dev == NULL) {
-    return PORT_ERROR;
-  }
-
-  /* 就绪校验：确认 CubeMX 已生成 MX_I2C1_Init 且时钟符合 app_config 期望 */
+  /* 初始化 I2C 总线；重复调用沿用已建立的总线。 */
   if (i2c_port_init(APP_I2C_CLK_HZ) != PORT_OK) {
     return PORT_ERROR;
   }
 
   /* 上电稳定等待（DHT20 要求 >=40 ms，默认取 100 ms，见 app_config.h）。
-   * 只在首次（或上次失败后）执行，使重复 init 不产生额外阻塞。 */
-  if (!s_powered_) {
+   * 首次初始化时执行一次，后续通信重试不重复等待。 */
+  if (!s_power_on_wait_done) {
     port_delay_ms(APP_DHT20_POWER_ON_DELAY_MS);
-    s_powered_ = true;
+    s_power_on_wait_done = true;
   }
 
   uint8_t status = 0U;
   port_status_t st = dht20_read_status_(&status);
   if (st != PORT_OK) {
-    return dht20_fail_(st);
+    return st;
   }
 
   if ((status & DHT20_STATUS_CAL_MASK) == DHT20_STATUS_CAL_MASK) {
@@ -202,24 +185,19 @@ static port_status_t dht20_ops_init_(sensor_dev_t *dev) {
   st = i2c_port_write(dev->addr7, init_cmd, (uint16_t)sizeof(init_cmd),
                       APP_I2C_TIMEOUT_MS);
   if (st != PORT_OK) {
-    return dht20_fail_(st);
+    return st;
   }
   port_delay_ms(DHT20_CAL_WAIT_MS);
 
   st = dht20_read_status_(&status);
   if (st != PORT_OK) {
-    return dht20_fail_(st);
+    return st;
   }
   /* 校准位仍未置起说明器件异常（接线/供电/型号不符），如实上报而非假装成功 */
-  return ((status & DHT20_STATUS_CAL_BIT) != 0U) ? PORT_OK
-                                                 : dht20_fail_(PORT_ERROR);
+  return ((status & DHT20_STATUS_CAL_BIT) != 0U) ? PORT_OK : PORT_ERROR;
 }
 
 static port_status_t dht20_ops_read_(sensor_dev_t *dev, sensor_sample_t *out) {
-  if ((dev == NULL) || (out == NULL)) {
-    return PORT_ERROR;
-  }
-
   const uint8_t cmd[3] = {DHT20_CMD_MEASURE, DHT20_MEASURE_ARG0,
                           DHT20_MEASURE_ARG1};
   uint8_t raw[DHT20_READ_LEN] = {0};

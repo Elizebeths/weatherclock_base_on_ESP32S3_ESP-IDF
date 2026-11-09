@@ -8,9 +8,7 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 
-static bool s_port_initialized;
 static portMUX_TYPE s_critical_lock = portMUX_INITIALIZER_UNLOCKED;
-static uint32_t s_critical_depth_per_core[portNUM_PROCESSORS];
 
 const char *port_status_str(port_status_t status) {
   switch (status) {
@@ -27,22 +25,9 @@ const char *port_status_str(port_status_t status) {
   }
 }
 
-void port_init(void) {
-  port_enter_critical();
-  s_port_initialized = true;
-  port_exit_critical();
-}
-
-bool port_is_initialized(void) {
-  port_enter_critical();
-  bool initialized = s_port_initialized;
-  port_exit_critical();
-  return initialized;
-}
-
 uint32_t port_cycles(void) {
 #if APP_PORT_DWT_ENABLE
-  return port_is_initialized() ? esp_cpu_get_cycle_count() : 0;
+  return esp_cpu_get_cycle_count();
 #else
   return 0;
 #endif
@@ -76,22 +61,10 @@ void port_delay_ms(uint32_t delay_ms) {
 
 void port_enter_critical(void) {
   portENTER_CRITICAL_SAFE(&s_critical_lock);
-  ++s_critical_depth_per_core[xPortGetCoreID()];
 }
 
 void port_exit_critical(void) {
-  /* 调用方必须已在当前核心进入临界区。 */
-  if (s_critical_depth_per_core[xPortGetCoreID()] == 0)
-    abort();
-  --s_critical_depth_per_core[xPortGetCoreID()];
   portEXIT_CRITICAL_SAFE(&s_critical_lock);
-}
-
-uint32_t port_critical_nesting(void) {
-  port_enter_critical();
-  uint32_t critical_depth = s_critical_depth_per_core[xPortGetCoreID()] - 1;
-  port_exit_critical();
-  return critical_depth;
 }
 
 void port_system_reset(void) {

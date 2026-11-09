@@ -5,6 +5,7 @@
  *
  * @note    分层位置：L1（Devices/display/gfx）。所有原语只依赖画布
  *          （lcd_canvas），不含 HAL / STM32 符号。
+ *          c 必须指向已构造的画布；本层不重复检查画布指针。
  *
  * 统一语义（取代旧 lcd_gfx 的历史包袱）：
  *   · 坐标一律为 int32（便于表达负数与越界），**统一左闭右开**含义的游程；
@@ -53,7 +54,7 @@ void lcd_draw_line(lcd_canvas_t *c, int32_t x0, int32_t y0, int32_t x1, int32_t 
 /** @brief 画矩形**描边**（1 像素宽） */
 void lcd_draw_rect_outline(lcd_canvas_t *c, const lcd_rect_t *r, lcd_color_t color);
 
-/** @brief 填充矩形 */
+/** @brief 填充矩形；r 必须非 NULL，宽高为 0 时不绘制 */
 void lcd_fill_rect(lcd_canvas_t *c, const lcd_rect_t *r, lcd_color_t color);
 
 /**

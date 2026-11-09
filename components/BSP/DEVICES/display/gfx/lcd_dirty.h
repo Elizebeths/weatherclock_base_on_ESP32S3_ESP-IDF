@@ -56,14 +56,11 @@ void lcd_dirty_add_screen(void);
 
 /**
  * @brief 取出全部脏区并清空表（快照语义）
- * @param out       输出数组
- * @param capacity  out 的容量
- * @param count     实际写出的数量
- * @retval true  成功
- * @retval false 参数非法
+ * @param out 非空输出数组，至少容纳 DISPLAY_DIRTY_MAX 个矩形
+ * @return 实际写出的数量
  * @note  快照 + 清空使「渲染过程中产生的新脏区」留到下一轮，避免重入死循环。
  */
-bool lcd_dirty_take_all(lcd_rect_t *out, uint32_t capacity, uint32_t *count);
+uint32_t lcd_dirty_take_all(lcd_rect_t out[DISPLAY_DIRTY_MAX]);
 
 #ifdef __cplusplus
 }

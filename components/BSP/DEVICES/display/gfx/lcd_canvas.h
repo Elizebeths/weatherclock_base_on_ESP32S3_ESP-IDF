@@ -17,6 +17,7 @@
  *
  * 坐标约定：画布 API 一律使用**屏幕坐标**（左上角原点），画布内部
  *          按 bounds 偏移映射到缓冲区。上层因此感知不到条带的存在。
+ * 调用约定：c 必须非空；操作前须完成画布构造，后端不重复判空。
  *
  * 后端（两个）：
  *   · buf == NULL  → **直写面板**：每个水平游程一次设窗 + 一次填充提交；
@@ -76,7 +77,7 @@ bool lcd_canvas_clip(const lcd_canvas_t *c, const lcd_rect_t *r,
 
 /**
  * @brief 写入一段水平像素
- * @param r 目标区域；**必须已裁剪到画布 bounds 内**（由 lcd_draw_* 保证）
+ * @param r 非空矩形；宽高须 >0，且已裁剪到画布 bounds 内（由 lcd_draw_* 保证）
  * @note  这是画布的后端原语：直写模式 = 一次设窗 + 一次填充提交；
  *        条带模式 = 一段内存写入。所有绘制原语最终都归约到本接口。
  */
@@ -85,8 +86,8 @@ void lcd_canvas_rect(lcd_canvas_t *c, const lcd_rect_t *r, lcd_color_t color);
 /**
  * @brief 把一块 RGB565 源数据写入画布
  * @param c             画布
- * @param r             目标区域；**必须已裁剪到画布 bounds 内**
- * @param src           源数据起点（RGB565，高字节在前，行优先）
+ * @param r             非空矩形；宽高须 >0，且已裁剪到画布 bounds 内
+ * @param src           非空源数据起点（RGB565，高字节在前，行优先）
  * @param src_stride_px 源数据每行像素数（用于裁剪后按行取数）
  * @note  直写模式走驱动层 panel_blit，此时要求 src_stride_px == r->w
  *        （否则置 c->err = LCD_ERR_UNSUPPORTED）；条带模式按行搬运，

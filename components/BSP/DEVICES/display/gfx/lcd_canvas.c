@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 
+#include "common/port.h"
 #include "display/panel/panel_st7789.h"
 
 /* ==========================================================================
@@ -16,9 +17,7 @@
  * ========================================================================== */
 
 void lcd_canvas_direct(lcd_canvas_t *c, const lcd_rect_t *area) {
-  if (c == NULL) {
-    return;
-  }
+  APP_ASSERT(c != NULL);
   c->buf = NULL;
   c->stride = 0U;
   c->bounds = (area != NULL) ? *area : lcd_rect_screen();
@@ -27,9 +26,7 @@ void lcd_canvas_direct(lcd_canvas_t *c, const lcd_rect_t *area) {
 
 void lcd_canvas_buffer(lcd_canvas_t *c, uint8_t *buf, uint16_t stride,
                        const lcd_rect_t *area) {
-  if ((c == NULL) || (buf == NULL) || (area == NULL)) {
-    return;
-  }
+  APP_ASSERT(c != NULL && buf != NULL && area != NULL);
   c->buf = buf;
   c->stride = stride;
   c->bounds = *area;
@@ -42,9 +39,6 @@ void lcd_canvas_buffer(lcd_canvas_t *c, uint8_t *buf, uint16_t stride,
 
 bool lcd_canvas_clip(const lcd_canvas_t *c, const lcd_rect_t *r,
                      lcd_rect_t *out) {
-  if (c == NULL) {
-    return false;
-  }
   return lcd_rect_intersect(&c->bounds, r, out);
 }
 
@@ -53,16 +47,8 @@ bool lcd_canvas_clip(const lcd_canvas_t *c, const lcd_rect_t *r,
  * ========================================================================== */
 
 void lcd_canvas_rect(lcd_canvas_t *c, const lcd_rect_t *r, lcd_color_t color) {
-  if ((c == NULL) || lcd_rect_is_empty(r)) {
-    return;
-  }
-  if (panel_is_busy()) {
-    c->err = LCD_ERR_BUSY;
-    return;
-  }
-
   if (c->buf == NULL) {
-    /* 直写面板：一次设窗 + 分块 DMA 重复提交纯色 */
+    /* 直写面板：一次设窗 + 分块同步提交纯色 */
     const lcd_err_t err = panel_fill(r->x, r->y, r->w, r->h, color);
     if (err != LCD_OK) {
       c->err = err;
@@ -87,18 +73,10 @@ void lcd_canvas_rect(lcd_canvas_t *c, const lcd_rect_t *r, lcd_color_t color) {
 
 void lcd_canvas_blit(lcd_canvas_t *c, const lcd_rect_t *r, const uint8_t *src,
                      uint16_t src_stride_px) {
-  if ((c == NULL) || lcd_rect_is_empty(r) || (src == NULL)) {
-    return;
-  }
-
   if (c->buf == NULL) {
     /* 直写面板要求源数据与目标同宽（panel_blit 只接受紧凑数据） */
     if (src_stride_px != r->w) {
       c->err = LCD_ERR_UNSUPPORTED;
-      return;
-    }
-    if (panel_is_busy()) {
-      c->err = LCD_ERR_BUSY;
       return;
     }
     const lcd_err_t err = panel_blit(r->x, r->y, r->w, r->h, src);

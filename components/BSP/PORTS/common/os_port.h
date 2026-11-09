@@ -1,16 +1,17 @@
 /** ESP32-S3 OS adapter. ESP-IDF always runs FreeRTOS; APP_OS_FREERTOS
  * selects application task creation versus app_loop polling only. Mutexes and
  * semaphores use real FreeRTOS synchronization in both modes.
- * Objects have application lifetime and must not be copied or moved after init.
+ * Pass non-NULL, zero-initialized objects with application lifetime; do not copy
+ * or move them after init. Create each task once, before concurrent use.
  * Fixed, static pools: 24 recursive mutexes, 16 counting semaphores, 4 tasks.
- * init is idempotent and retains existing state. Pool exhaustion leaves handle
+ * Mutex/sem init is idempotent and retains existing state. Pool exhaustion leaves handle
  * NULL; lock/take/task_create report failure. No OS-object heap allocation.
  * Timeout 0 means try immediately; waits are rounded up to an OS tick.
- * Mutex APIs are task-only. sem_give_isr handles both ISR and synchronous
- * completion contexts. Semaphore count is a diagnostic snapshot.
+ * APIs are task-only except sem_give_isr, which requires ISR context.
+ * sem_init requires max > 0 and initial <= max. Unlock requires ownership.
  * task_create stack_words is in 32-bit words (1..1024), converted to IDF bytes.
  * Polling mode only records the entry; RTOS task entries that return suspend.
- * Call os_port_init before constructing objects.
+ * Initialize each mutex or semaphore before use; no global OS setup is required.
  */
 
 #ifndef OS_PORT_H
@@ -26,13 +27,10 @@ extern "C" {
 #include "app_config.h"
 
 typedef struct {
-  uint32_t depth;
   void *handle;
 } os_mutex_t;
 
 typedef struct {
-  volatile uint32_t count;
-  uint32_t max;
   void *handle;
 } os_sem_t;
 
@@ -44,8 +42,6 @@ typedef struct {
   const char *name;
   void *handle;
 } os_task_t;
-
-void os_port_init(void);
 
 bool os_port_is_rtos(void);
 

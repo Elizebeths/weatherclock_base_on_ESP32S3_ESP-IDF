@@ -20,7 +20,7 @@
  */
 static bool lcd_draw_clip_box_(const lcd_canvas_t *c, int32_t x, int32_t y,
                                int32_t w, int32_t h, lcd_rect_t *out) {
-  if ((c == NULL) || (w <= 0) || (h <= 0)) {
+  if ((w <= 0) || (h <= 0)) {
     return false;
   }
 
@@ -85,10 +85,7 @@ static uint32_t lcd_draw_isqrt_(uint32_t n) {
  * ========================================================================== */
 
 void lcd_draw_clear(lcd_canvas_t *c, lcd_color_t color) {
-  if (c == NULL) {
-    return;
-  }
-  lcd_canvas_rect(c, &c->bounds, color);
+  lcd_fill_rect(c, &c->bounds, color);
 }
 
 void lcd_draw_hline(lcd_canvas_t *c, int32_t x, int32_t y, uint16_t w,
@@ -120,9 +117,6 @@ void lcd_draw_box(lcd_canvas_t *c, int32_t x, int32_t y, uint16_t w, uint16_t h,
 }
 
 void lcd_fill_rect(lcd_canvas_t *c, const lcd_rect_t *r, lcd_color_t color) {
-  if (lcd_rect_is_empty(r)) {
-    return;
-  }
   lcd_draw_box(c, (int32_t)r->x, (int32_t)r->y, r->w, r->h, color);
 }
 

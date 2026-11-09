@@ -21,9 +21,6 @@ lcd_err_t lcd_dev_init(void) {
 
   /* 复位时序 + 寄存器序列 + 打开显示（全部由驱动层的序列表驱动） */
   err = panel_start();
-  if ((err == LCD_OK) && lcd_is_bus_error()) {
-    err = LCD_ERR_BUS;
-  }
 
   /* 面板复位后显存内容是**随机的**：必须铺一层已知底色，否则任何「没被画到」
    * 的区域都会显示随机显存内容，即肉眼可见的「花屏背景」。
@@ -40,7 +37,3 @@ lcd_err_t lcd_dev_init(void) {
 void lcd_bl_on(void) { lcd_port_pin_write(LCD_PIN_BL, true); }
 
 void lcd_bl_off(void) { lcd_port_pin_write(LCD_PIN_BL, false); }
-
-bool lcd_is_bus_error(void) { return lcd_port_is_bus_error(); }
-
-void lcd_dev_clear_bus_error(void) { lcd_port_clear_bus_error(); }

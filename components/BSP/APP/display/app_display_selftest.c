@@ -59,7 +59,7 @@ typedef char lcd_test_bmp_size_check_[(sizeof(s_test_bmp) == 16U * 16U * 2U)
  * @brief 点亮自检画面：色条 / 边框 / 文本 / 数字 / 定点小数 / 圆 / 小图
  * @note  用于核对方向、颜色通道与边缘偏移
  */
-static void lcd_show_test_pattern_(void) {
+static lcd_err_t lcd_show_test_pattern_(void) {
   lcd_canvas_t c;
   lcd_canvas_direct(&c, NULL);
 
@@ -94,6 +94,7 @@ static void lcd_show_test_pattern_(void) {
   lcd_draw_circle_filled(&c, (int32_t)(LCD_WIDTH / 2U), 260, 40U,
                          LCD_COLOR_PURPLE);
   lcd_draw_bitmap(&c, 200, 124, 16U, 16U, s_test_bmp);
+  return c.err;
 }
 
 void app_display_selftest(void) {
@@ -108,10 +109,10 @@ void app_display_selftest(void) {
   }
 
   /* 2) 显示完整测试图案（设备初始化已由 app_display_init 完成） */
-  lcd_show_test_pattern_();
+  const lcd_err_t err = lcd_show_test_pattern_();
 
   /* 3) 总线失败时用「快闪 10 次」提示（正常应保持常亮） */
-  if (lcd_is_bus_error()) {
+  if (err != LCD_OK) {
     for (uint8_t i = 0U; i < 10U; i++) {
       lcd_bl_on();
       lcd_port_delay_ms(80U);

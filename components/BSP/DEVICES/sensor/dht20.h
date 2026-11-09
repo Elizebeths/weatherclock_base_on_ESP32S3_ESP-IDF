@@ -39,8 +39,8 @@ extern "C" {
  * @retval PORT_OK      已校准，可立即测量
  * @retval PORT_ERROR   I2C 未就绪 / 校准位始终未置起
  * @retval PORT_TIMEOUT 从机不应答
- * @note  幂等。上电等待时长取 APP_DHT20_POWER_ON_DELAY_MS；
- *        调用前需完成 MX_I2C1_Init()（内部会幂等确认 i2c_port 就绪）。
+ * @note  幂等。内部初始化 I2C 总线，首次调用等待 APP_DHT20_POWER_ON_DELAY_MS；
+ *        后续通信失败重试不重复上电等待。
  */
 port_status_t dht20_init(void);
 
@@ -54,10 +54,10 @@ port_status_t dht20_probe(void);
 
 /**
  * @brief 触发一次测量并取回温湿度
- * @param out 输出，单位见 sensor_sample_t（0.1 ℃ / 0.1 %RH）
+ * @param out 非 NULL 输出，单位见 sensor_sample_t（0.1 ℃ / 0.1 %RH）
  * @retval PORT_OK      测量成功且 CRC 校验通过
  * @retval PORT_TIMEOUT 转换在 APP_DHT20_CONVERT_TIMEOUT_MS 内未完成
- * @retval PORT_ERROR   参数非法 / CRC 不符 / 总线错误
+ * @retval PORT_ERROR   CRC 不符 / 数据超量程 / 总线错误
  * @note  阻塞时长约 APP_DHT20_CONVERT_MIN_MS；
  *        等待转换期间**不持有总线锁**，不会阻塞共用 I2C1 的其他模块（如后续触摸）。
  */

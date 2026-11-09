@@ -39,9 +39,9 @@ typedef struct {
 /** @brief 内置 16x32 ASCII 字体（0x20~0x7E） */
 extern const lcd_font_t LCD_FONT_ASCII16X32;
 
-/** @brief 每字符占用字节数 */
+/** @brief 每字符占用字节数；f 必须为有效字体 */
 static inline uint32_t lcd_font_char_bytes(const lcd_font_t *f) {
-  return (f == NULL) ? 0U : ((uint32_t)f->bytes_per_row * (uint32_t)f->h);
+  return (uint32_t)f->bytes_per_row * (uint32_t)f->h;
 }
 
 /** @brief 字符在字模数据中的下标（0 基，映射到 [first,last]） */
@@ -49,10 +49,10 @@ static inline uint8_t lcd_font_index(const lcd_font_t *f, char ch) {
   return (uint8_t)((uint8_t)ch - f->first);
 }
 
-/** @brief 字体是否包含该字符 */
+/** @brief 字体是否包含该字符；f 必须为有效字体 */
 static inline bool lcd_font_supports(const lcd_font_t *f, char ch) {
   const uint8_t u = (uint8_t)ch;
-  return (f != NULL) && (u >= f->first) && (u <= f->last);
+  return (u >= f->first) && (u <= f->last);
 }
 
 #ifdef __cplusplus

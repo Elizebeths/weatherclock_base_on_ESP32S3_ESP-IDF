@@ -11,7 +11,6 @@
  * Explicit void lock() asserts on timeout; unlock() requires ownership.
  * Probe maps NACK to PORT_TIMEOUT, and tries up to trials times.
  * Scan stops when found[] is full; returns the stored count.
- * last_error retains the last ESP-IDF failure code; zero means no failure yet.
  * All bus operations are task-only. Initialize before concurrent use.
  */
 
@@ -64,13 +63,9 @@ void i2c_port_lock(void);
 
 void i2c_port_unlock(void);
 
-uint32_t i2c_port_lock_depth(void);
-
 uint8_t i2c_port_bus_index(void);
 
 uint32_t i2c_port_clock_hz(void);
-
-uint32_t i2c_port_last_error(void);
 
 #ifdef __cplusplus
 }

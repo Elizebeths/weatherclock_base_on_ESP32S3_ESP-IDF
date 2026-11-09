@@ -1,5 +1,5 @@
 /** ESP32-S3 common port. Public API is independent of ESP-IDF.
- * Initialize with port_init(); milliseconds/microseconds use esp_timer and
+ * No explicit initialization is required. Milliseconds/microseconds use esp_timer and
  * wrap at 32 bits. Cycles are per-core CPU cycles; compare on one core with
  * a stable CPU frequency. APP_PORT_DWT_ENABLE retains its historical name.
  * Delay-ms yields to FreeRTOS; delay-us busy waits. Neither is ISR-safe.
@@ -29,10 +29,6 @@ typedef enum {
 
 const char *port_status_str(port_status_t status);
 
-void port_init(void);
-
-bool port_is_initialized(void);
-
 uint32_t port_cycles(void);
 
 uint32_t port_cycles_per_us(void);
@@ -48,8 +44,6 @@ void port_delay_us(uint32_t us);
 void port_enter_critical(void);
 
 void port_exit_critical(void);
-
-uint32_t port_critical_nesting(void);
 
 uint32_t port_clk_hz(void);
 
