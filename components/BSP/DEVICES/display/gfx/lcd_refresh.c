@@ -13,7 +13,6 @@
 
 #include <stddef.h>
 
-#include "app_config.h"
 #include "common/os_port.h"
 #include "display/gfx/lcd_dirty.h"
 #include "display/panel/panel_st7789.h"
@@ -29,10 +28,6 @@
 static uint8_t s_strip[DISPLAY_WIDTH * DISPLAY_STRIP_LINES * DISPLAY_BPP];
 
 static os_mutex_t s_lock; /**< 保护脏区表 */
-#if APP_OS_FREERTOS
-static os_sem_t s_req;    /**< 「有脏区」通知（RTOS 模式） */
-static os_task_t s_task;  /**< 显示任务（RTOS 模式） */
-#endif
 static lcd_render_cb_t s_render;
 static bool s_ready = false;
 
@@ -74,27 +69,11 @@ static lcd_err_t lcd_refresh_render_area_(const lcd_rect_t *area) {
 }
 
 /* ==========================================================================
- * 任务体 / 驱动入口
+ * 轮询驱动入口
  * ========================================================================== */
-
-#if APP_OS_FREERTOS
-/**
- * @brief 显示任务体（仅 RTOS 模式创建）
- * @note  收到通知或等待超时后尝试冲刷当前脏区。
- *        刷新失败的区域不会自动重排，总线恢复后需由调用方重新标脏。
- */
-static void lcd_refresh_task_entry_(void *arg) {
-  (void)arg;
-  for (;;) {
-    (void)os_port_sem_take(&s_req, APP_DISPLAY_DIRTY_TIMEOUT_MS);
-    (void)lcd_refresh_flush();
-  }
-}
-#endif
 
 void lcd_refresh_poll(void) {
 	if (!s_ready)					return;
-	if (os_port_is_rtos())			return; /* 刷新由显示任务负责 */
 	(void)lcd_refresh_flush();
 }
 
@@ -121,16 +100,6 @@ lcd_err_t lcd_refresh_init(lcd_render_cb_t on_render) {
   lcd_dirty_reset();
   s_ready = true;
 
-#if APP_OS_FREERTOS
-  os_port_sem_init(&s_req, 0U, 1U);
-  const bool ok = os_port_task_create(&s_task, lcd_refresh_task_entry_, "lcd",
-                                      NULL, APP_DISPLAY_TASK_STACK_WORDS,
-                                      APP_DISPLAY_TASK_PRIORITY);
-  if (!ok) {
-    s_ready = false;
-    return LCD_ERR_STATE;
-  }
-#endif
   return LCD_OK;
 }
 
@@ -147,9 +116,6 @@ lcd_err_t lcd_invalidate(const lcd_rect_t *r) {
   (void)lcd_dirty_add(r);
   os_port_mutex_unlock(&s_lock);
 
-#if APP_OS_FREERTOS
-  os_port_sem_give(&s_req);
-#endif
   return LCD_OK;
 }
 
@@ -163,9 +129,6 @@ lcd_err_t lcd_invalidate_screen(void) {
   lcd_dirty_add_screen();
   os_port_mutex_unlock(&s_lock);
 
-#if APP_OS_FREERTOS
-  os_port_sem_give(&s_req);
-#endif
   return LCD_OK;
 }
 

@@ -54,9 +54,7 @@ void app_time_poll(void)
 
 void app_init(void)
 {
-
     app_display_init();
-
     /* 传感器：先建立业务状态，再跑一次上电自检（自检关闭时为空实现） */
     app_sensor_init();
     app_sensor_selftest();
@@ -86,6 +84,6 @@ void app_loop(void)
         app_net_update();
     }
 
-    /* 显示：更新动态内容并驱动刷新（RTOS 模式下为空操作，由显示任务负责） */
+    /* 显示：更新动态内容并驱动刷新 */
     app_display_poll();
 }
