@@ -27,9 +27,6 @@ static const char *TAG = "sensor";
  * ========================================================================== */
 
 static bool s_ready = false;    /**< 器件是否已初始化成功 */
-static bool s_has_last = false; /**< s_last 是否已被写入过有效值 */
-static sensor_sample_t s_last;  /**< 最近一次成功的采样 */
-
 /** @brief 当前绑定的传感器型号（换型号只改这一行） */
 static sensor_dev_t *sensor_bind_(void) { return dht20_device(); }
 
@@ -67,27 +64,23 @@ void app_sensor_init(void) {
 
 bool app_sensor_ready(void) { return s_ready; }
 
-const sensor_sample_t *app_sensor_last(void) {
-  return s_has_last ? &s_last : NULL;
-}
-
-void app_sensor_poll(void) {
+bool app_sensor_poll(sensor_sample_t *out) {
   sensor_dev_t *const dev = sensor_bind_();
 
   if (!s_ready) {
     /* 自愈：允许运行期重新初始化（更换器件/接线复位后无需重启 MCU） */
     app_sensor_init();
-    if (!s_ready)		return;
+    if (!s_ready)		return false;
   }
 
   sensor_sample_t sample;
   const port_status_t st = sensor_dev_read(dev, &sample);// 调用传感器读取，存入sample
   if (st != PORT_OK) {
     ESP_LOGE(TAG, "%s read failed: %s", sensor_dev_name(dev), port_status_str(st));
-    return;
+    return false;
   }
 
-  s_last = sample;// 更新最新的数值，放入s_last
-  s_has_last = true;//标记为发布
+  *out = sample;
   app_sensor_log_sample(&sample);
+  return true;
 }

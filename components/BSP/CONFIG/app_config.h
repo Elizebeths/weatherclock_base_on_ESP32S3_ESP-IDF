@@ -1,23 +1,3 @@
-/**
- ******************************************************************************
- * @file    app_config.h
- * @brief   编译期功能开关与阈值（周期 / 超时 / 分块 / 日志级别）
- *
- * @note    分层位置：Config/。任何层都可以包含本文件；本文件不包含任何头文件，
- *          以保持零依赖（避免 Config → Ports → Config 的循环包含）。
- ******************************************************************************
- *
- * 适配来源
- *   二级 · 自有模块：lcdLib 的 lcd.h「用户配置区」
- *                    （LCD_SPI_TIMEOUT_MS 100ms、LCD_SPI_CHUNK_BYTES 4096、
- *                      LCD_BL_ACTIVE_HIGH、LCD_WIDTH/HEIGHT、字库几何）
- *                    与 iic_DHT20 的 Core/Src/i2c.c（I2C1 @ 100 kHz）
- *
- * 对应《PH1 显示攻坚专题》的性能要求：
- *   SPI 预分频 4 → 2（18 → 36 MHz，按 18/27/36 MHz 分档压测，不稳回退并记录）
- ******************************************************************************
- */
-
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
@@ -102,7 +82,16 @@
 
 #define APP_NET_PERIOD_MS 30000U
 
-#define APP_NET_TIME_MS 1000U
+/** 任务调度：ESP-IDF 的任务栈大小以字节为单位。 */
+#define APP_UI_PERIOD_MS 50U
+#define APP_NET_RETRY_MS 5000U
+#define APP_UI_PRIORITY 3U
+#define APP_SENSOR_PRIORITY 2U
+#define APP_NET_PRIORITY 1U
+#define APP_UI_STACK_BYTES 4096U
+#define APP_SENSOR_STACK_BYTES 3072U
+#define APP_NET_STACK_BYTES 6144U
+
 
 /**
  * 是否启用传感器上电自检（语义与 APP_LCD_ENABLE_SELFTEST 一致）：

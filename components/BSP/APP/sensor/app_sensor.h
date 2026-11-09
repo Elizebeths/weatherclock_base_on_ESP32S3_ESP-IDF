@@ -32,10 +32,10 @@ void app_sensor_init(void);
 /**
  * @brief 周期采集一次温湿度
  * @note  未就绪时会先尝试一次自愈式重初始化（覆盖接线松动、上电顺序等情况）；
- *        正常一帧阻塞约 APP_DHT20_CONVERT_MIN_MS，由主循环按
- *        APP_SENSOR_SAMPLE_PERIOD_MS 调用。
+ *        正常一帧阻塞约 APP_DHT20_CONVERT_MIN_MS，仅由传感器任务按
+ *        APP_SENSOR_PERIOD_MS 调用；成功时写入 out 并返回 true。
  */
-void app_sensor_poll(void);
+bool app_sensor_poll(sensor_sample_t *out);
 
 /**
  * @brief 上电自检：扫描总线 → 探测 0x38 → 初始化 → 读一次并输出日志
@@ -45,12 +45,6 @@ void app_sensor_selftest(void);
 
 /** @brief 传感器当前是否已初始化成功（供显示/业务层决定是否展示温湿度） */
 bool app_sensor_ready(void);
-
-/**
- * @brief 若最新的采样已存在，返回值
- * @return 指向内部静态缓存的指针；尚无有效采样时返回 NULL
- */
-const sensor_sample_t *app_sensor_last(void);
 
 /** @brief 把采样值打印成一行日志（如 "T=26.5 C, RH=51.2 %"），供自检与周期采集共用 */
 void app_sensor_log_sample(const sensor_sample_t *sample);

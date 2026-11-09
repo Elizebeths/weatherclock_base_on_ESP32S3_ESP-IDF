@@ -9,7 +9,7 @@
  * 刷新模型：本层只做两件事 ——
  *   1) 提供「屏幕重绘回调」（被刷新调度器在需要重绘的区域上调用）；
  *   2) 内容变化时调用 lcd_invalidate() 标脏；
- *   3) 周期入口 app_display_poll() 由 app_loop() 调用，更新动态内容并驱动刷新。
+ *   3) 周期入口 app_display_poll() 由显示任务调用，更新动态内容并驱动刷新。
  *  不再需要旧实现里的「首帧标志位 s_chrome_painted」之类的手工状态：
  *  刷新时机与范围完全由脏区决定。
  ******************************************************************************
@@ -17,6 +17,10 @@
 
 #ifndef APP_DISPLAY_H
 #define APP_DISPLAY_H
+
+#include "sensor/sensor.h"
+#include "net/app_net.h"
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,9 +36,10 @@ void app_display_init(void);
 
 /**
  * @brief 周期入口：更新动态内容（标脏）并驱动刷新
- * @note  由 app_loop() 每次循环调用；内部按 APP_DISPLAY_PERIOD_MS 限频。
+ * @note  仅由显示任务调用；参数为任务内快照，NULL 表示尚无有效数据。
  */
-void app_display_poll(void);
+void app_display_poll(const sensor_sample_t *indoor, const app_net_sample_t *outdoor,
+                      const struct tm *clock);
 
 /**
  * @brief 上电自检：背光闪烁 3 次 → 呈现自检图案 → 总线失败时快闪 10 次

@@ -38,7 +38,7 @@ typedef struct
     size_t body_size; /* 正文长度，不包含 '\0' */
 } Device_http_response_t;
 
-// 连接WIFI
+/* 启动异步 Wi-Fi 连接，仅调用一次；网络任务通过事件组等待结果并处理重连。 */
 void Device_net_connect(void);
 
 /*
@@ -51,5 +51,6 @@ void Device_net_connect(void);
 */
 esp_err_t Device_net_http_get_data(const Device_http_request_t *request, char *date, size_t date_capacity, char *body, size_t body_capacity,
                                    Device_http_response_t *out_response);
-
+                                   
+esp_err_t Device_net_reconnect(void);
 #endif /* DEVCIE_NET_H */

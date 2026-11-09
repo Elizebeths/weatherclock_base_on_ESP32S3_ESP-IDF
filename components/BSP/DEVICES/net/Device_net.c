@@ -9,14 +9,12 @@
 #include "nvs_flash.h"
 #include <string.h>
 
-
 #include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <sys/socket.h>
 
 static const char *TAG = "wifi station";
-static int s_retry_num = 0;
 EventGroupHandle_t s_wifi_event_group;
 
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -26,30 +24,20 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
         // 连接事件则连接到指定的 AP
-        esp_wifi_connect();
+        if (esp_wifi_connect() != ESP_OK)   xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        // 断开事件则尝试重新连接
-        if (s_retry_num < ESP_MAXIMUM_RETRY)
-        {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
-        }
-        else
-        {
-            // 如果重试次数超过最大值，则设置失败位
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
-        ESP_LOGI(TAG, "connect to the AP fail");
+        /* 网络任务负责延时重连，回调仅发布状态。 */
+        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
     }
     // IP事件
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
-        s_retry_num = 0;
+        xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT);
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
@@ -57,6 +45,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 void Device_net_connect()
 {
     s_wifi_event_group = xEventGroupCreate();
+    ESP_ERROR_CHECK(s_wifi_event_group != NULL ? ESP_OK : ESP_ERR_NO_MEM);
 
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -86,25 +75,11 @@ void Device_net_connect()
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "wifi_init_station finished.");
+}
 
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
-
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
-    if (bits & WIFI_CONNECTED_BIT)
-    {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s", ESP_WIFI_SSID, ESP_WIFI_PASS);
-    }
-    else if (bits & WIFI_FAIL_BIT)
-    {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s", ESP_WIFI_SSID, ESP_WIFI_PASS);
-    }
-    else
-    {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-    }
+esp_err_t Device_net_reconnect(void)
+{
+    return esp_wifi_connect();
 }
 
 static esp_err_t Device_net_http_parse(char *response, char *date, size_t date_capacity, char *body, size_t body_capacity,
